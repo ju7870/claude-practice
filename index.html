@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>계산기</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1e1f24;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .calc {
+    width: 320px;
+    background: #2b2d34;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 10px 30px rgba(0,0,0,.4);
+  }
+  .display {
+    background: #1a1b1f;
+    color: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    text-align: right;
+    min-height: 90px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+  .expr { color: #8a8d96; font-size: 16px; min-height: 20px; word-break: break-all; }
+  .result { font-size: 36px; font-weight: 600; word-break: break-all; }
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  button {
+    height: 60px;
+    border: none;
+    border-radius: 12px;
+    font-size: 20px;
+    cursor: pointer;
+    background: #3a3d46;
+    color: #fff;
+    transition: filter .1s, transform .05s;
+  }
+  button:hover { filter: brightness(1.15); }
+  button:active { transform: scale(.96); }
+  .op { background: #ff9f0a; }
+  .fn { background: #5a5e6a; }
+  .eq { background: #30d158; }
+  .zero { grid-column: span 2; }
+</style>
+</head>
+<body>
+<div class="calc">
+  <div class="display">
+    <div class="expr" id="expr"></div>
+    <div class="result" id="result">0</div>
+  </div>
+  <div class="keys">
+    <button class="fn" data-action="clear">C</button>
+    <button class="fn" data-action="back">⌫</button>
+    <button class="fn" data-action="percent">%</button>
+    <button class="op" data-op="/">÷</button>
+
+    <button data-num="7">7</button>
+    <button data-num="8">8</button>
+    <button data-num="9">9</button>
+    <button class="op" data-op="*">×</button>
+
+    <button data-num="4">4</button>
+    <button data-num="5">5</button>
+    <button data-num="6">6</button>
+    <button class="op" data-op="-">−</button>
+
+    <button data-num="1">1</button>
+    <button data-num="2">2</button>
+    <button data-num="3">3</button>
+    <button class="op" data-op="+">+</button>
+
+    <button class="zero" data-num="0">0</button>
+    <button data-num=".">.</button>
+    <button class="eq" data-action="equals">=</button>
+  </div>
+</div>
+
+<script>
+  const exprEl = document.getElementById('expr');
+  const resultEl = document.getElementById('result');
+  const symbols = { '+': '+', '-': '−', '*': '×', '/': '÷' };
+
+  let current = '0';    // 현재 입력 중인 숫자
+  let previous = null;  // 이전 값
+  let operator = null;  // 대기 중인 연산자
+  let justEvaluated = false;
+
+  function format(n) {
+    if (!isFinite(n)) return '오류';
+    return String(parseFloat(n.toPrecision(12)));
+  }
+
+  function compute(a, b, op) {
+    a = parseFloat(a); b = parseFloat(b);
+    switch (op) {
+      case '+': return a + b;
+      case '-': return a - b;
+      case '*': return a * b;
+      case '/': return b === 0 ? NaN : a / b;
+    }
+  }
+
+  function render() {
+    resultEl.textContent = current;
+    exprEl.textContent = operator ? `${previous} ${symbols[operator]}` : '';
+  }
+
+  function inputNum(n) {
+    if (current === '오류' || justEvaluated) { current = '0'; justEvaluated = false; }
+    if (n === '.') {
+      if (!current.includes('.')) current += '.';
+    } else {
+      current = current === '0' ? n : current + n;
+    }
+    render();
+  }
+
+  function inputOp(op) {
+    if (current === '오류') return;
+    if (operator && !justEvaluated && current !== '') {
+      current = format(compute(previous, current, operator));
+    }
+    previous = current;
+    operator = op;
+    current = '0';
+    justEvaluated = false;
+    render();
+    resultEl.textContent = previous;
+  }
+
+  function equals() {
+    if (!operator) return;
+    const res = format(compute(previous, current, operator));
+    exprEl.textContent = `${previous} ${symbols[operator]} ${current} =`;
+    current = res;
+    previous = null;
+    operator = null;
+    justEvaluated = true;
+    resultEl.textContent = current;
+  }
+
+  function clearAll() {
+    current = '0'; previous = null; operator = null; justEvaluated = false;
+    render();
+  }
+
+  function back() {
+    if (justEvaluated || current === '오류') { clearAll(); return; }
+    current = current.length > 1 ? current.slice(0, -1) : '0';
+    if (current === '-') current = '0';
+    render();
+  }
+
+  function percent() {
+    if (current === '오류') return;
+    current = format(parseFloat(current) / 100);
+    render();
+  }
+
+  document.querySelector('.keys').addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.num) inputNum(b.dataset.num);
+    else if (b.dataset.op) inputOp(b.dataset.op);
+    else ({ clear: clearAll, back, percent, equals })[b.dataset.action]();
+  });
+
+  // 키보드 지원
+  document.addEventListener('keydown', e => {
+    const k = e.key;
+    if (/^[0-9.]$/.test(k)) inputNum(k);
+    else if ('+-*/'.includes(k)) inputOp(k);
+    else if (k === 'Enter' || k === '=') { e.preventDefault(); equals(); }
+    else if (k === 'Backspace') back();
+    else if (k === 'Escape') clearAll();
+    else if (k === '%') percent();
+  });
+</script>
+</body>
+</html>
